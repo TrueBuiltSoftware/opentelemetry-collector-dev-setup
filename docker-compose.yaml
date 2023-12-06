@@ -1,4 +1,8 @@
 version: "2"
+
+volumes:
+  prometheus_data: {}
+
 services:
 
   # Jaeger
@@ -9,6 +13,13 @@ services:
       - "16686:16686"
       - "14268"
       - "14250"
+    environment:
+      # Enables connecting to Promethus for monitoring
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR=true
+      - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
+      - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
 
   # Zipkin
   zipkin-all-in-one:
@@ -42,5 +53,6 @@ services:
     restart: always
     volumes:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     ports:
       - "9090:9090"

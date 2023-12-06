@@ -4,7 +4,36 @@ receivers:
       grpc:
       http:
 
+# Enables Monitoring for Jaeger
+# https://www.jaegertracing.io/docs/1.51/spm/
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+      - name: http.target
+    exemplars:
+      enabled: true
+    exclude_dimensions: ['status.code']
+    dimensions_cache_size: 1000
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+    metrics_flush_interval: 15s
+    events:
+      enabled: true
+      dimensions:
+        - name: exception.type
+        - name: exception.message
+
 exporters:
+  prometheusremotewrite:
+    endpoint: http://localhost:9090/api/v1/write
+    target_info:
+      enabled: true
+
   prometheus:
     endpoint: "0.0.0.0:8889"
     const_labels:
@@ -16,8 +45,9 @@ exporters:
     endpoint: "http://zipkin-all-in-one:9411/api/v2/spans"
     format: proto
 
-  jaeger:
-    endpoint: jaeger-all-in-one:14250
+  # https://opentelemetry.io/blog/2023/jaeger-exporter-collector-migration/
+  otlp/jaeger:
+    endpoint: jaeger-all-in-one:4317
     tls:
       insecure: true
 
@@ -37,8 +67,11 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging, zipkin, jaeger]
+      exporters: [spanmetrics, logging, zipkin, otlp/jaeger]
     metrics:
-      receivers: [otlp]
+      receivers: [otlp, spanmetrics]
       processors: [batch]
-      exporters: [logging, prometheus]
+      exporters: [prometheusremotewrite, logging, prometheus]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      exporters: [prometheusremotewrite]
